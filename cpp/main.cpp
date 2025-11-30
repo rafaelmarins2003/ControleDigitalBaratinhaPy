@@ -12,20 +12,20 @@ namespace { // Escopo anonimo para constantes e estados locais
   const float Ts = 0.01f; // Periodo de controle em segundos (10 ms)
 
   // Ganhos finais da Parte C
-  const float Kp = 0.04374066092882029f;
+  const float Kp = 0.004374066092882029f;
   const float Ki = 0.00844489305954211f;
   const float Kd = 2.2236406200986116f;
 
   // Filtro do termo derivativo (0 < alpha < 1)
-  const float derivAlpha = 0.80f;
+  const float derivAlpha = 0.9999999999999f;
 
   // Saturacao em termos de PWM (Baratinha usa 8 bits: -255 a 255)
   const float Umax = 255.0f;
   const float Umin = -255.0f;
 
   // Segurança e referência
-  const float distSeguranca_cm = 3.0f;   // desliga motores se < 3 cm
-  const float setpoint_cm      = 10.0f;  // ex: manter 10 cm do obstáculo
+  const float distSeguranca_cm = 30.0f;   // desliga motores se < 3 cm
+  const float setpoint_cm      = 100.0f;  // ex: manter 10 cm do obstáculo
 
   // Estados do PID
   float erro       = 0.0f;
@@ -68,13 +68,11 @@ namespace { // Escopo anonimo para constantes e estados locais
                   + Kd * deriv_filt;
 
     // Saturacao
-    float u_sat = u_unsat;
-    if (u_sat > Umax) u_sat = Umax;
-    if (u_sat < Umin) u_sat = Umin;
+    float u_sat = constrain(u_unsat,-1,1);
 
     // Anti-windup (integral condicionado)
-    bool saturou_alto  = (u_unsat > Umax);
-    bool saturou_baixo = (u_unsat < Umin);
+    bool saturou_alto  = (u_unsat > 1);
+    bool saturou_baixo = (u_unsat < -1);
 
     bool libera_integral =
         (!saturou_alto && !saturou_baixo) ||      // não saturou
@@ -116,7 +114,7 @@ void loop() {
 
   // 1) Leitura da distância (ToF retorna em mm)
   float dist_mm = bra.readDistance();
-  float dist_cm = dist_mm / 10.0f; // converte mm -> cm
+  float dist_cm = dist_mm; // converte mm -> cm
 
   // 2) Segurança: se muito perto, desliga motores e reseta controlador
   if (dist_cm < distSeguranca_cm) {
@@ -130,10 +128,10 @@ void loop() {
   float u = calculaPID(setpoint_cm, dist_cm);
 
   // 4) Aplica controle nos motores (u já está saturado em [-255, 255])
-  int pwm = (int)lroundf(u);   // converte float -> int
+  int pwm = u*255;   // converte float -> int
 
   // move1D: positivo anda para frente, negativo para trás
-  bra.move1D(pwm);
+  bra.move1D(-pwm);
 
   // (Opcional) debug na serial
   // bra.printf("dist=%.2f cm, ref=%.2f cm, erro=%.2f, u=%.2f, pwm=%d\n",
